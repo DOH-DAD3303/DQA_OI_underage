@@ -1,0 +1,1058 @@
+-- Databricks notebook source
+-- MAGIC %md
+-- MAGIC # Ineligible Age
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # SQL approach
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### J&J, Astrazeneca, NovaVax and Unknown
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC WITH jnj_astra_nova_unk as (
+-- MAGIC SELECT 
+-- MAGIC   vm.ASIIS_PAT_ID_PTR,
+-- MAGIC   vm.ASIIS_FAC_ID,
+-- MAGIC   pm.PAT_FIRST_NAME,
+-- MAGIC   pm.PAT_LAST_NAME,
+-- MAGIC   pm.PAT_BIRTH_DATE,
+-- MAGIC   CAST(vm.VACC_DATE as date),
+-- MAGIC   FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC   
+-- MAGIC   CASE  WHEN vm.ASIIS_VACC_CODE = 2091 THEN "ASTRAZENICA"
+-- MAGIC         WHEN vm.ASIIS_VACC_CODE = 2092 THEN "JANSSEN"
+-- MAGIC         WHEN vm.ASIIS_VACC_CODE = 3002 THEN "NOVAVAX"
+-- MAGIC         WHEN vm.ASIIS_VACC_CODE = 2090 THEN "UNKNOWN"
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC FROM raw_waiis.vaccination_master vm --limit 5
+-- MAGIC LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC AND vm.ASIIS_VACC_CODE in (2092, 2091, 2090, 3002)
+-- MAGIC AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 18
+-- MAGIC AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date())) 
+-- MAGIC --AND (FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12)) != (datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE))
+-- MAGIC )
+-- MAGIC 
+-- MAGIC SELECT * FROM jnj_astra_nova_unk
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### pfizer 12+
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC WITH pfizer12 as (
+-- MAGIC     SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME,
+-- MAGIC         pm.PAT_LAST_NAME,
+-- MAGIC         pm.PAT_BIRTH_DATE,
+-- MAGIC         vm.VACC_DATE,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 2089 OR vm.ASIIS_VACC_CODE = 3015 THEN "PFIZER"
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE in (2089, 3015)
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 12
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date())) 
+-- MAGIC )
+-- MAGIC 
+-- MAGIC SELECT * from pfizer12
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ##Pfizer Kids
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC WITH pfizerkid as (
+-- MAGIC     SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME,
+-- MAGIC         pm.PAT_LAST_NAME,
+-- MAGIC         pm.PAT_BIRTH_DATE,
+-- MAGIC         vm.VACC_DATE,
+-- MAGIC         FLOOR(months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC    
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3016 THEN "PFIZER KIDS" 
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE in (3016)
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 5 
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date())) 
+-- MAGIC )
+-- MAGIC 
+-- MAGIC SELECT * from pfizerkid
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## pfizer pedia
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC WITH pfizer_pedia as (
+-- MAGIC       SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID as facility_id,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_frst,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         pm.PAT_BIRTH_DATE as patient_dob,
+-- MAGIC         vm.VACC_DATE as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) as age_at_vacc_in_mo,
+-- MAGIC         --datediff(year, pm.PAT_BIRTH_DATE, vm.VACC_DATE) as age_at_vacc,
+-- MAGIC                
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3017 THEN "PFIZER PEDS"
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=3017
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) < 6
+-- MAGIC         --AND datediff(month, pm.PAT_BIRTH_DATE, vm.VACC_DATE) < 6 
+-- MAGIC           AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date()))
+-- MAGIC )
+-- MAGIC 
+-- MAGIC SELECT * from pfizer_pedia
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ##Moderna Peds
+
+-- COMMAND ----------
+
+-- DBTITLE 1,Moderna Peds
+-- MAGIC %md
+-- MAGIC -- Moderna Peds
+-- MAGIC WITH moderna_peds AS(
+-- MAGIC SELECT
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID as facility_id,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_frst,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         pm.PAT_BIRTH_DATE as patient_dob,
+-- MAGIC         vm.VACC_DATE as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) as age_at_vacc_in_mo,
+-- MAGIC         --MONTHS_BETWEEN(vm.VACC_DATE, pm.PAT_BIRTH_DATE) as age_at_vacc_in_mo,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3028 THEN "MODERNA PEDS" end as vacc_type
+-- MAGIC       
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=3028
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) <6
+-- MAGIC         --AND MONTHS_BETWEEN( vm.VACC_DATE, pm.PAT_BIRTH_DATE) < 6
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date())) 
+-- MAGIC )
+-- MAGIC SELECT * from moderna_peds 
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## Moderna Kids
+
+-- COMMAND ----------
+
+-- DBTITLE 1,Moderna Kids
+-- MAGIC %md
+-- MAGIC WITH moderna_kids AS(
+-- MAGIC SELECT
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID as facility_id,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_frst,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         pm.PAT_BIRTH_DATE as patient_dob,
+-- MAGIC         vm.VACC_DATE as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         --datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3026 THEN "MODERNA KIDS" end as vacc_type
+-- MAGIC         
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=3026
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 6
+-- MAGIC         --AND datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) < 6
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date())) 
+-- MAGIC )
+-- MAGIC SELECT * FROM moderna_kids
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ##Moderna12/ Adult
+
+-- COMMAND ----------
+
+-- DBTITLE 1,Moderna 12+ 
+-- MAGIC %md
+-- MAGIC WITH moderna AS(
+-- MAGIC SELECT
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID as facility_id,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         pm.PAT_BIRTH_DATE as patient_dob,
+-- MAGIC         vm.VACC_DATE as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         --datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 2080 THEN "MODERNA" end as vacc_type
+-- MAGIC         
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=2080
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 12
+-- MAGIC         --AND datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) < 12
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(current_date())) 
+-- MAGIC )
+-- MAGIC SELECT * FROM moderna
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## matching birth and vax date
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC WITH vaxdate_is_dob as (
+-- MAGIC     SELECT 
+-- MAGIC       vm.ASIIS_PAT_ID_PTR,
+-- MAGIC       pm.PAT_FIRST_NAME,
+-- MAGIC       pm.PAT_LAST_NAME,
+-- MAGIC       pm.PAT_BIRTH_DATE,
+-- MAGIC       vm.VACC_DATE,
+-- MAGIC       FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC       
+-- MAGIC       CASE WHEN vm.ASIIS_VACC_CODE = 2080 THEN "MODERNA"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3026 THEN "MODERNA KIDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3028 THEN "MODERNA PEDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2089 OR vm.ASIIS_VACC_CODE = 3015 THEN "PFIZER"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3016 THEN "PFIZER KIDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3017 THEN "PFIZER PEDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3002 THEN "NOVAVAX"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2090 THEN "UNKNOWN"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2091 THEN "ASTRAZENICA"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2092 THEN "JANSSEN"
+-- MAGIC 
+-- MAGIC             end as vacc_type
+-- MAGIC 
+-- MAGIC     FROM raw_waiis.vaccination_master vm 
+-- MAGIC     LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC     ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC     WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC     AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC     AND vm.ASIIS_VACC_CODE in (2089, 2092, 2091, 2080, 2090, 3015, 3016, 3026, 3028, 3017, 3002)
+-- MAGIC     AND vm.VACC_DATE = pm.PAT_BIRTH_DATE
+-- MAGIC )
+-- MAGIC 
+-- MAGIC SELECT * from vaxdate_is_dob
+-- MAGIC -- limit 5
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC # Python Approach
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## Approach
+-- MAGIC 1. Read in the data using the sql queries above
+-- MAGIC 2. As of now, as a work around, download provider data in Oracle or SSMS, upload in the storage, and read here
+-- MAGIC 3. The provider table will have subset of just the irmssysid and facid, for use in adding them as contacts to each output table
+-- MAGIC 4. Use unionByName appraoch to join all tables as a another table
+-- MAGIC 5. Convert each to pandas and write as excel file (This part is still in the process. I have contacted DSSU assistance re: Logan Downing for assistance)
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC # import packages
+-- MAGIC 
+-- MAGIC from pyspark.sql.functions import *
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC 
+-- MAGIC # astra, jnj, nova, unk
+-- MAGIC astra_jnj_nova_unk = (
+-- MAGIC   spark.sql('''
+-- MAGIC       SELECT 
+-- MAGIC       vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC       --CAST(vm.VACC_DATE as date),
+-- MAGIC       FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC 
+-- MAGIC       CASE  WHEN vm.ASIIS_VACC_CODE = 2091 THEN "ASTRAZENICA"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2092 THEN "JANSSEN"
+-- MAGIC             --WHEN vm.ASIIS_VACC_CODE = 3002 THEN "NOVAVAX"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2090 THEN "UNKNOWN"
+-- MAGIC             end as vacc_type
+-- MAGIC 
+-- MAGIC     FROM raw_waiis.vaccination_master vm --limit 5
+-- MAGIC     LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC     ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC     WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC     AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC     AND vm.ASIIS_VACC_CODE in (2092, 2091, 2090)--, 3002)
+-- MAGIC     AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 18
+-- MAGIC     AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1)))
+-- MAGIC       ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # novavax
+-- MAGIC novavax = (
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3002 THEN "NOVAVAX"
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE = 3002
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 12
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1)))
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # pfizer 12 and adult
+-- MAGIC pfizer12 = (
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE IN (2089, 3015) THEN "PFIZER"
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE in (2089, 3015)
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 12
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1)))
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # pfizer kids
+-- MAGIC pfizer_kids = (
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR(months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC    
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3016 THEN "PFIZER KIDS" 
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE in (3016)
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 5 
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1))) 
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # pfizer pediatrics
+-- MAGIC pfizer_peds = (
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT 
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) as age_at_vacc,
+-- MAGIC         --datediff(year, pm.PAT_BIRTH_DATE, vm.VACC_DATE) as age_at_vacc,
+-- MAGIC                
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3017 THEN "PFIZER PEDS"
+-- MAGIC         end as vacc_type
+-- MAGIC 
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=3017
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) < 6
+-- MAGIC         --AND datediff(month, pm.PAT_BIRTH_DATE, vm.VACC_DATE) < 6 
+-- MAGIC           AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1)))
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # moderna 12 and adult
+-- MAGIC moderna12 = (
+-- MAGIC   spark.sql('''
+-- MAGIC     SELECT
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         --datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 2080 THEN "MODERNA" end as vacc_type
+-- MAGIC         
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=2080
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 12
+-- MAGIC         --AND datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) < 12
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1)))
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # moderna kids
+-- MAGIC moderna_kids = (
+-- MAGIC   spark.sql('''
+-- MAGIC     SELECT
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC         --datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) as age_at_vacc,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3026 THEN "MODERNA KIDS" end as vacc_type
+-- MAGIC         
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=3026
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) < 6
+-- MAGIC         --AND datediff(year,pm.PAT_BIRTH_DATE, vm.VACC_DATE) < 6
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1)))
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC #moderna pediatrics
+-- MAGIC moderna_peds = (
+-- MAGIC   spark.sql('''
+-- MAGIC     SELECT
+-- MAGIC         vm.ASIIS_PAT_ID_PTR,
+-- MAGIC         vm.ASIIS_FAC_ID,
+-- MAGIC         pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC         pm.PAT_LAST_NAME as patient_last,
+-- MAGIC         CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC         CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC         FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) as age_at_vacc,
+-- MAGIC         --MONTHS_BETWEEN(vm.VACC_DATE, pm.PAT_BIRTH_DATE) as age_at_vacc_in_mo,
+-- MAGIC         
+-- MAGIC         CASE WHEN vm.ASIIS_VACC_CODE = 3028 THEN "MODERNA PEDS" end as vacc_type
+-- MAGIC       
+-- MAGIC       FROM raw_waiis.vaccination_master vm 
+-- MAGIC       LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC       ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC       WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC         AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC         AND vm.ASIIS_VACC_CODE=3028
+-- MAGIC         AND FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)) <6
+-- MAGIC         --AND MONTHS_BETWEEN( vm.VACC_DATE, pm.PAT_BIRTH_DATE) < 6
+-- MAGIC         AND (month(vm.VACC_DATE) = month(add_months(current_date(), -1)) AND year(vm.VACC_DATE) = year(add_months(current_date(), -1))) 
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # bdate errors
+-- MAGIC matching_bdates =(
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT 
+-- MAGIC       vm.ASIIS_PAT_ID_PTR,
+-- MAGIC       vm.ASIIS_FAC_ID,
+-- MAGIC       pm.PAT_FIRST_NAME as patient_first,
+-- MAGIC       pm.PAT_LAST_NAME as patient_last,
+-- MAGIC       CAST(pm.PAT_BIRTH_DATE as date) as patient_dob,
+-- MAGIC       CAST(vm.VACC_DATE as date) as vax_date,
+-- MAGIC       FLOOR (months_between(vm.VACC_DATE,pm.PAT_BIRTH_DATE)/12) as age_at_vacc,
+-- MAGIC       
+-- MAGIC       CASE WHEN vm.ASIIS_VACC_CODE = 2080 THEN "MODERNA"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3026 THEN "MODERNA KIDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3028 THEN "MODERNA PEDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2089 OR vm.ASIIS_VACC_CODE = 3015 THEN "PFIZER"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3016 THEN "PFIZER KIDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3017 THEN "PFIZER PEDS"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 3002 THEN "NOVAVAX"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2090 THEN "UNKNOWN"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2091 THEN "ASTRAZENICA"
+-- MAGIC             WHEN vm.ASIIS_VACC_CODE = 2092 THEN "JANSSEN"
+-- MAGIC 
+-- MAGIC             end as vacc_type
+-- MAGIC 
+-- MAGIC     FROM raw_waiis.vaccination_master vm 
+-- MAGIC     LEFT JOIN raw_waiis.patient_master pm
+-- MAGIC     ON vm.ASIIS_PAT_ID_PTR = pm.ASIIS_PAT_ID 
+-- MAGIC 
+-- MAGIC     WHERE vm.DELETION_DATE IS NULL 
+-- MAGIC     AND NVL(vm.HISTORICAL,'A') <> 'Y'
+-- MAGIC     AND vm.ASIIS_VACC_CODE in (2089, 2092, 2091, 2080, 2090, 3015, 3016, 3026, 3028, 3017, 3002)
+-- MAGIC     AND vm.VACC_DATE = pm.PAT_BIRTH_DATE
+-- MAGIC   ''')
+-- MAGIC 
+-- MAGIC )
+-- MAGIC 
+-- MAGIC # PROVIDERS
+-- MAGIC ## read the file
+-- MAGIC 
+-- MAGIC init_provider = (
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT distinct o.recordid,
+-- MAGIC 		m.asiisfacid,
+-- MAGIC 		m.irmssysid,
+-- MAGIC 		m.LocVfcPin,
+-- MAGIC 		m.LocVtrcksId,
+-- MAGIC 		o.orgname,
+-- MAGIC 		o.locname,
+-- MAGIC 		o.LocType,
+-- MAGIC 		o.LocShipStreet1,
+-- MAGIC 		o.LocShipStreet2,
+-- MAGIC 		o.LocShipCity,
+-- MAGIC 		o.LocShipState,
+-- MAGIC 		o.LocShipZip,
+-- MAGIC 		o.LocShipCounty,
+-- MAGIC 		o.LocBackupEmail,
+-- MAGIC 		o.LocBackupEmail2,
+-- MAGIC 		o.LocPrimaryEmail,
+-- MAGIC 		o.LocPrimaryFname, 
+-- MAGIC 		o.LocPrimaryLname,
+-- MAGIC 		o.LocPrimaryPhone,
+-- MAGIC 		o.LocPrimaryPhoneExt,
+-- MAGIC 		m.VMApproved
+-- MAGIC   FROM Delta.`dbfs:/mnt/cedar/03_USABLE/REDCAP_IMMS/Delta/Covid19_Enrollment_Org_Fac` o
+-- MAGIC   LEFT JOIN Delta.`dbfs:/mnt/cedar/03_USABLE/REDCAP_IMMS/Delta/Covid19_Enrollment_Master` m
+-- MAGIC   on o.recordid = m.recordid
+-- MAGIC   WHERE (vmapproved =1 and iisapproved = 1 and iiscomplete = 1 AND vmcomplete =1) OR (vmapproved =3)
+-- MAGIC   ''')
+-- MAGIC )
+-- MAGIC 
+-- MAGIC # subset a provider1 to inlcude the irmssysid
+-- MAGIC providers1 = (
+-- MAGIC   init_provider.select('irmssysid').distinct()
+-- MAGIC )
+-- MAGIC 
+-- MAGIC #subset a provider2 to include only distinct asiisfacid
+-- MAGIC providers2 = (
+-- MAGIC   init_provider.select('asiisfacid').distinct()
+-- MAGIC )
+-- MAGIC 
+-- MAGIC 
+-- MAGIC # filter facility organization table that are still active based on FACILITYINACTIVESTATUS = null
+-- MAGIC fac_org = (
+-- MAGIC   spark.sql('''
+-- MAGIC   SELECT ASIISFACID, 
+-- MAGIC     FACILITYNAME, 
+-- MAGIC      IRMSSYSID, 
+-- MAGIC      RESPONSIBLEORGANIZATION, 
+-- MAGIC      PIN,
+-- MAGIC      FACILITYINACTIVESTATUS 
+-- MAGIC   FROM usable_waiis.waiis_org_fac 
+-- MAGIC   WHERE FACILITYINACTIVESTATUS is null
+-- MAGIC   ''')
+-- MAGIC )
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ### General process per vaccine type
+-- MAGIC * filter ASIIS_FAC_ID which is not null
+-- MAGIC * join with fac_org table on ASIIS_FAC_ID and ASIISFACID and drop the initial table ASIIS_FAC_ID column
+-- MAGIC * join with provider1 subset on IRMSSYSID and irmssysid, then drop the fac_org IRMSSYSID column
+-- MAGIC * join with provider2 subset on ASIISFACID and drop the facility ASIISFACID
+-- MAGIC * join with the primary providers table on asiisfacid but drop the irmssysid
+-- MAGIC * create a new column with concatenated values from primary provider including name, email, and phone plus extension number, if any
+-- MAGIC * select all other columns in the order
+-- MAGIC 
+-- MAGIC ### join all tables to create another table of all underage records
+-- MAGIC * use unionByName() function to join each dataframe for the all_record table
+-- MAGIC * to write to excel, convert each to pandas, and write it in separate sheets (requested assistance to perform this last step)
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC 
+-- MAGIC ajnj = (astra_jnj_nova_unk
+-- MAGIC          .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC         .join(fac_org, astra_jnj_nova_unk.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(astra_jnj_nova_unk.ASIIS_FAC_ID)
+-- MAGIC         .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC         .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC         .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC       ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC # novavax
+-- MAGIC # Join all necessary dataframes: pfizer12, fac_org, providers1 with irmssysid only, and providers2 with asiisfacid and vmapproved to the new df called pfizer_adult1
+-- MAGIC 
+-- MAGIC novavacc = (
+-- MAGIC   # source df
+-- MAGIC   novavax
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, novavax.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(novavax.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC # Join all necessary dataframes: pfizer12, fac_org, providers1 with irmssysid only, and providers2 with asiisfacid and vmapproved to the new df called pfizer_adult1
+-- MAGIC 
+-- MAGIC pfizeradult = (
+-- MAGIC   # source df
+-- MAGIC   pfizer12
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, pfizer12.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(pfizer12.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC pfizerkids = (
+-- MAGIC   # source df
+-- MAGIC   pfizer_kids
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, pfizer_kids.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(pfizer_kids.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC pfizerpeds = (
+-- MAGIC   # source df
+-- MAGIC   pfizer_peds
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, pfizer_peds.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(pfizer_peds.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC   #.withColumn('age_at_vacc', f.format_string("%03d", "col1"))
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC modernaadult = (
+-- MAGIC   # source df
+-- MAGIC   moderna12
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, moderna12.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(moderna12.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %py
+-- MAGIC # modernaadult.count()
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC 
+-- MAGIC modernakids = (
+-- MAGIC   # source df
+-- MAGIC   moderna_kids
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, moderna_kids.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(moderna_kids.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+-- MAGIC 
+-- MAGIC modernakids = modernakids.dropDuplicates()
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC 
+-- MAGIC modernapeds = (
+-- MAGIC   # source df
+-- MAGIC   moderna_peds
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, moderna_peds.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(moderna_peds.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC 
+-- MAGIC birthdate_errors = (
+-- MAGIC   # source df
+-- MAGIC   matching_bdates
+-- MAGIC   # filter out null facility_id
+-- MAGIC   .filter(col('ASIIS_FAC_ID').isNotNull())
+-- MAGIC   # chain joins with appropriate fac_org and provider tables
+-- MAGIC   .join(fac_org, matching_bdates.ASIIS_FAC_ID == fac_org.ASIISFACID, 'left').drop(matching_bdates.ASIIS_FAC_ID)
+-- MAGIC   .join(providers1, fac_org.IRMSSYSID==providers1.irmssysid, 'left').drop(fac_org.IRMSSYSID)
+-- MAGIC   .join(providers2, fac_org.ASIISFACID==providers2.asiisfacid,'left').drop(fac_org.ASIISFACID)
+-- MAGIC   .join(init_provider, ['asiisfacid'], 'left').drop(init_provider.irmssysid)
+-- MAGIC ).select('ASIIS_PAT_ID_PTR'
+-- MAGIC                ,'patient_first'
+-- MAGIC                ,'patient_last'
+-- MAGIC                ,'patient_dob'
+-- MAGIC                ,'vax_date'
+-- MAGIC                ,'age_at_vacc'
+-- MAGIC                ,'vacc_type'
+-- MAGIC                ,'PIN'
+-- MAGIC                ,'irmssysid'
+-- MAGIC                ,'RESPONSIBLEORGANIZATION'
+-- MAGIC                ,'asiisfacid'
+-- MAGIC                ,'FACILITYNAME'
+-- MAGIC                ,(concat_ws(' ' # concat the following columns from providers table with space in between
+-- MAGIC                     ,'LocPrimaryFname'
+-- MAGIC                      ,'LocPrimaryLname'
+-- MAGIC                      ,'LocPrimaryEmail'
+-- MAGIC                      ,'LocPrimaryPhone'
+-- MAGIC                      ,concat_ws(' ',lit('Ext:'), 'LocPrimaryPhoneExt'))
+-- MAGIC            #rename the new column as primary_contact
+-- MAGIC            .alias('primary_contact')
+-- MAGIC           ))
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC 
+-- MAGIC # union of all tables
+-- MAGIC all_underage = ajnj.unionByName(novavacc).unionByName(pfizeradult).unionByName(pfizerkids).unionByName(pfizerpeds).unionByName(modernaadult).unionByName(modernakids).unionByName(modernapeds).unionByName(birthdate_errors)
+-- MAGIC all_underage
+
+-- COMMAND ----------
+
+-- MAGIC %md
+-- MAGIC ## download each dataframe as csv then perform excel workbook conversion in python jupyter
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC def WriteToSingleCSV(df, dataPath, fileName):
+-- MAGIC     '''
+-- MAGIC     writes a given spark dataframe to a single specified csv file
+-- MAGIC     Args:
+-- MAGIC         df: spark dataframe
+-- MAGIC           pyspark dataframe you wish to write out to a csv
+-- MAGIC         dataPath: string
+-- MAGIC           folder you wish to write to
+-- MAGIC           does NOT end in "/"
+-- MAGIC         filName: string
+-- MAGIC           file name you wish to write to
+-- MAGIC           does NOT include ".csv"
+-- MAGIC           
+-- MAGIC     Returns:
+-- MAGIC         string ('OK')
+-- MAGIC     '''
+-- MAGIC     # Coalesce all the data from the dataframe onto a single node - performance hit but required to write single csv
+-- MAGIC     fullPath = f"{dataPath}/{fileName}"
+-- MAGIC     # writes csv with null columns as empty strings
+-- MAGIC     df.coalesce(1).write.format("csv").option("header", "true").option("nullValue", "").mode("overwrite").save(fullPath)
+-- MAGIC     # Find oddly named csv file in newly created csv folder
+-- MAGIC     files = dbutils.fs.ls(fullPath)
+-- MAGIC     csv_file = [x.path for x in files if x.path.endswith(".csv")][0]
+-- MAGIC     # Rename to correct name
+-- MAGIC     dbutils.fs.mv(csv_file, fullPath.rstrip('/')+'.csv')
+-- MAGIC     # Remove old file
+-- MAGIC     dbutils.fs.rm(fullPath, recurse = True)
+-- MAGIC     print('\nprocess complete!\n')
+
+-- COMMAND ----------
+
+-- MAGIC %python
+-- MAGIC WriteToSingleCSV(ajnj, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'ajnj')
+-- MAGIC WriteToSingleCSV(novavacc, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'novavacc')
+-- MAGIC WriteToSingleCSV(pfizeradult, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'pfizeradult')
+-- MAGIC WriteToSingleCSV(pfizerkids, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'pfizerkids')
+-- MAGIC WriteToSingleCSV(pfizerpeds, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'pfizerpeds')
+-- MAGIC WriteToSingleCSV(modernaadult, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'modernaadult')
+-- MAGIC WriteToSingleCSV(modernakids, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'modernakids')
+-- MAGIC WriteToSingleCSV(modernapeds, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'modernapeds')
+-- MAGIC WriteToSingleCSV(birthdate_errors, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'birthdate_errors')
+-- MAGIC WriteToSingleCSV(all_underage, 'dbfs:/mnt/cedar/06_SANDBOX/IIS/QATeamInformatics/underage_reports/', 'all_underage')
